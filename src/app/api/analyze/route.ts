@@ -21,7 +21,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: `CodeChef profile '${username}' not found` }, { status: 404 });
     }
 
-    const html = await response.target ? await response.text() : await response.text();
+    const html = await response.text();
 
     // Regex extraction engine to read CodeChef's internal frontend state object
     const ratingRegex = /"rating":\s*(\d+)/;

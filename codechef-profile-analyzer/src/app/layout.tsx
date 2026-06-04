@@ -1,19 +1,17 @@
-import './globals.css'; // Standard Next.js tailwind setup import
-import { Inter } from 'next/font/google';
-
-const inter = Inter({ subsets: ['latin'] });
+import './globals.css';
 
 export const metadata = {
-  title: 'CodeChef Profile Analyzer',
-  description: 'Deep analytical insights into your CodeChef performance',
+  title: 'CodeChef Analytics Engine',
+  description: 'Performance analyzer deployment workspace',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className={`${inter.className} bg-slate-950 text-slate-50 min-h-screen`}>
-        {children}
-      </body>
+      <head>
+        <script src="https://cdn.tailwindcss.com"></script>
+      </head>
+      <body className="bg-slate-900 text-slate-100 min-h-screen font-sans">{children}</body>
     </html>
   );
 }

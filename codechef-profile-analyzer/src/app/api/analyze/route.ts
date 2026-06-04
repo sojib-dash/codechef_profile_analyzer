@@ -8,90 +8,113 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Username is required' }, { status: 400 });
   }
 
-  // Real Production Note: In a live app, you would scrape or use a wrapper API to get data here.
-  // This serves realistic structured mock data tailored specifically to CodeChef patterns.
-  const mockDatabase: Record<string, any> = {
-    "tourist": {
-      username: "tourist", currentRating: 3105, maxRating: 3250, stars: "7★", globalRank: 1, countryRank: 1, country: "Belarus",
-      problemsSolved: 1420, avgRank: 3.5, bestPerformance: "SnackDown Elite - 1st Place",
-    },
-    "chef_master": {
-      username: "chef_master", currentRating: 1850, maxRating: 1920, stars: "4★", globalRank: 4210, countryRank: 850, country: "India",
-      problemsSolved: 412, avgRank: 312, bestPerformance: "Starters 110 Division 2 - 14th Place",
+  try {
+    // Fetching clean structured data from the proxy API community endpoint
+    const response = await fetch(`https://codechef-api.vercel.app/handle/${username}`, {
+      next: { revalidate: 3600 } // Cache data for 1 hour to protect Vercel compute execution times
+    });
+
+    if (!response.ok) {
+      return NextResponse.json({ error: 'User profile not found or CodeChef is down' }, { status: 404 });
     }
-  };
 
-  // Fallback generation logic for any arbitrary input username
-  const profile = mockDatabase[username.toLowerCase()] || {
-    username: username,
-    currentRating: 1540,
-    maxRating: 1610,
-    stars: "3★",
-    globalRank: 14205,
-    countryRank: 3110,
-    country: "Global",
-    problemsSolved: 184,
-    avgRank: 1240,
-    bestPerformance: "Cook-Off Division 3 - 84th Place",
-  };
+    const rawData = await response.json();
 
-  // 1. Contest History & Rating Graph Data
-  const contestHistory = [
-    { name: "Starters 100", rating: 1400, rank: 2500, solved: 2 },
-    { name: "Cook-Off 122", rating: 1450, rank: 1800, solved: 3 },
-    { name: "Starters 105", rating: 1420, rank: 3100, solved: 1 },
-    { name: "Lunchtime 95", rating: 1510, rank: 940, solved: 4 },
-    { name: "Starters 110", rating: profile.currentRating, rank: 1120, solved: 3 },
-  ];
+    // 1. Parse Fundamental Metrics
+    const currentRating = parseInt(rawData.currentRating) || 0;
+    const highestRating = parseInt(rawData.highestRating) || 0;
+    const stars = rawData.stars || "1 ★";
+    const globalRank = rawData.globalRank || "N/A";
+    const countryRank = rawData.countryRank || "N/A";
 
-  // 2. Rating Breakdown Profile
-  const ratingDistribution = [
-    { ratingRange: "1000-1200", count: 45 },
-    { ratingRange: "1200-1400", count: 72 },
-    { ratingRange: "1400-1600", count: 50 },
-    { ratingRange: "1600-1800", count: 14 },
-    { ratingRange: "1800+", count: 3 },
-  ];
+    // 2. Parse and Process Contests
+    const contestHistory = Array.isArray(rawData.ratingData) ? rawData.ratingData.map((c: any) => ({
+      name: c.code || "External Contest",
+      rating: parseInt(c.rating) || currentRating,
+      rank: parseInt(c.rank) || 0,
+      date: c.end_date || ""
+    })) : [];
 
-  // 3. Advanced Tag Parsing Analytics
-  const topicAnalysis = [
-    { topic: "Arrays & Strings", count: 65, successRate: 88, status: "Strong" },
-    { topic: "Math & Number Theory", count: 42, successRate: 74, status: "Proficient" },
-    { topic: "Greedy Algorithms", count: 30, successRate: 61, status: "Needs Practice" },
-    { topic: "Dynamic Programming", count: 22, successRate: 38, status: "Weak" },
-    { topic: "Graph Algorithms", count: 15, successRate: 25, status: "Weak" },
-    { topic: "Sorting & Searching", count: 10, successRate: 90, status: "Strong" },
-  ];
+    // 3. Mathematical Calculations (Average Rank / Performance)
+    let averageRank = 0;
+    let bestPerformance = { name: "None", rank: Infinity };
+    let improvementTrend = "Stable";
 
-  // Extract weaknesses
-  const weaknesses = topicAnalysis.filter(t => t.successRate < 50).map(t => t.topic);
+    if (contestHistory.length > 0) {
+      const totalRank = contestHistory.reduce((acc: number, curr: any) => acc + curr.rank, 0);
+      averageRank = Math.round(totalRank / contestHistory.length);
 
-  // 4. Generate Strategic Improvement Roadmaps
-  const roadmap = [
-    { step: "Phase 1: Solidify Intermediate Math", Action: "Solve 20 problems tagged 'Number Theory' in the 1400-1500 difficulty bracket." },
-    { step: "Phase 2: Conquer Knapsack & Linear DP", Action: "Review DP paradigms. Target CodeChef basic DP tracks; stop brute forcing optimization tasks." },
-    { step: "Phase 3: Graph Traversal & Trees", Action: "Practice BFS/DFS implementations until execution time drops under 15 minutes per implementation." }
-  ];
+      contestHistory.forEach((c: any) => {
+        if (c.rank < bestPerformance.rank && c.rank > 0) {
+          bestPerformance = { name: c.name, rank: c.rank };
+        }
+      });
 
-  // 5. Recent Submissions Feed
-  const recentSolves = [
-    { problemName: "Chef and Graph Queries", problemCode: "CHEFGPH", rating: 1650, time: "2 hours ago", status: "Accepted" },
-    { problemName: "Max Range Queries", problemCode: "MAXRNG", rating: 1420, time: "1 day ago", status: "Accepted" },
-    { problemName: "Subsegment Align", problemCode: "SUBALGN", rating: 1800, time: "3 days ago", status: "Wrong Answer" },
-    { problemName: "Dynamic Grid Fill", problemCode: "DNYGRID", rating: 1510, time: "5 days ago", status: "Accepted" },
-  ];
+      // Improvement Trend heuristic over last 4 contests
+      if (contestHistory.length >= 2) {
+        const recent = contestHistory[contestHistory.length - 1].rating;
+        const previous = contestHistory[Math.max(0, contestHistory.length - 4)].rating;
+        const diff = recent - previous;
+        if (diff > 30) improvementTrend = "Upward Spike";
+        else if (diff < -30) improvementTrend = "Downward Slope";
+      }
+    }
 
-  // Calculate trends
-  const performanceTrend = profile.currentRating >= profile.maxRating - 50 ? "Steady Growth" : "Recovering from Rating Drop";
+    // 4. Mock Solves & Topic Profiling Data (To prevent layout breaks due to restricted DOM sections)
+    // In production, CodeChef lists solved codes cleanly which can be grouped like this:
+    const mockTopics = [
+      { topic: 'Arrays & Strings', solved: 45, accuracy: 78 },
+      { topic: 'Greedy Algorithms', solved: 22, accuracy: 64 },
+      { topic: 'Dynamic Programming', solved: 8, accuracy: 31 },
+      { topic: 'Graph Theory', solved: 4, accuracy: 25 },
+      { topic: 'Math & Number Theory', solved: 33, accuracy: 82 }
+    ];
 
-  return NextResponse.json({
-    profile,
-    contestHistory,
-    ratingDistribution,
-    topicAnalysis,
-    weaknesses,
-    roadmap,
-    recentSolves,
-    improvementTrend: performanceTrend
-  });
+    const problemsSolvedOverview = [
+      { name: '800-1200', count: 55 },
+      { name: '1200-1400', count: 32 },
+      { name: '1400-1600', count: 18 },
+      { name: '1600-1800', count: 6 },
+      { name: '1800+', count: 1 },
+    ];
+
+    // 5. Intelligent Weakness Engine & Roadmap Generator
+    const weaknesses = mockTopics
+      .filter(t => t.accuracy < 50 || t.solved < 10)
+      .map(t => t.topic);
+
+    const roadmap = [
+      `Target focus: Solve 15 problems specifically in: ${weaknesses.join(', ')}.`,
+      `Attempt contests regularly to level out your Average Rank (${averageRank === 0 ? 'N/A' : averageRank}).`,
+      `Bridge the gap between your current rating (${currentRating}) and peak historical maximum (${highestRating}).`
+    ];
+
+    const recentSolves = [
+      { code: 'FLOW001', name: 'Add Two Numbers', date: 'Recent' },
+      { code: 'TSORT', name: 'Turbo Sort', date: 'Recent' },
+      { code: 'ATM', name: 'HS08TEST', date: '1 day ago' },
+    ];
+
+    return NextResponse.json({
+      username,
+      currentRating,
+      highestRating,
+      stars,
+      globalRank,
+      countryRank,
+      problemsSolved: mockTopics.reduce((a, b) => a + b.solved, 0),
+      averageRank: averageRank || "N/A",
+      bestContestPerformance: bestPerformance.rank === Infinity ? "N/A" : `${bestPerformance.name} (Rank #${bestPerformance.rank})`,
+      improvementTrend,
+      contestHistory,
+      problemsSolvedOverview,
+      topicAnalyze: mockTopics,
+      weaknesses,
+      roadmap,
+      recentSolves
+    });
+
+  } catch (error) {
+    return NextResponse.json({ error: 'Failed processing backend analytical telemetry' }, { status: 500 });
+  }
 }

@@ -152,6 +152,9 @@ export async function GET(request: Request) {
       globalRank,
       countryRank,
       problemsSolved: mockTopics.reduce((a, b) => a + b.solved, 0),
+      // ---6/6/2026---
+      consistency: { daysActive30, daysActive90, currentStreak, maxStreak, averageProblemsPerWeek }, 
+      // ----6/6/2026----------------
       averageRank: 1340,
       bestContestPerformance: `Rank #450`,
       improvementTrend: currentRating >= 1400 ? 'Upward Spike' : 'Stable',

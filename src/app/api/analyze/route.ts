@@ -143,7 +143,20 @@ export async function GET(request: Request) {
       { code: 'TSORT', name: 'Turbo Sort' },
       { code: 'ATM', name: 'HS08TEST' },
     ];
+    
+    const calendarData = Array.from({ length: 30 }, (_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - (29 - i));
+      const dateString = d.toISOString().split('T')[0];
+      
+      // Simulates activity bursts (creates dark green, light green, or gray squares)
+      let activityCount = 0;
+      if (i % 5 === 0 || i % 8 === 0) activityCount = Math.floor(Math.random() * 3) + 1; 
+      if (i > 22 && daysActive30 > 5) activityCount = Math.floor(Math.random() * 4) + 1;
 
+      return { date: dateString, count: activityCount };
+    });
+    
     return NextResponse.json({
       username,
       currentRating,
@@ -153,7 +166,8 @@ export async function GET(request: Request) {
       countryRank,
       problemsSolved: mockTopics.reduce((a, b) => a + b.solved, 0),
       // ---6/6/2026---
-      consistency: { daysActive30, daysActive90, currentStreak, maxStreak, averageProblemsPerWeek }, 
+      consistency: { daysActive30, daysActive90, currentStreak, maxStreak, averageProblemsPerWeek },
+      calendarData,
       // ----6/6/2026----------------
       averageRank: 1340,
       bestContestPerformance: `Rank #450`,

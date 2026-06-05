@@ -161,6 +161,57 @@ export default function Dashboard() {
                 </div>
               </div>
             </div>
+
+            {/* --- PASTE THIS REPLACING THE ENTIRE PREVIOUS CONSISTENCY BOX --- */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-lg space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
+                <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2">
+                  📊 Submission Heatmap Matrix
+                </h3>
+                <div className="flex gap-4 text-xs text-slate-400">
+                  <span>Streak: <strong className="text-red-400">{data.consistency.currentStreak} days current</strong> / {data.consistency.maxStreak} max</span>
+                  <span>Velocity: <strong className="text-cyan-400">{data.consistency.averageProblemsPerWeek} / wk</strong></span>
+                </div>
+              </div>
+
+              {/* The Calendar Grid */}
+              <div className="flex flex-col items-center justify-center p-4 bg-slate-950 border border-slate-900 rounded-xl space-y-4">
+                <div className="grid grid-flow-col grid-rows-7 gap-2.5 max-w-full overflow-x-auto p-2">
+                  {data.calendarData.map((day: any, index: number) => {
+                    // Decide the color scale based on problem submission density
+                    let colorClass = "bg-slate-900 border border-slate-800/60"; // 0 solves (Gray)
+                    if (day.count === 1) colorClass = "bg-emerald-950 border border-emerald-900"; // 1 solve
+                    if (day.count === 2) colorClass = "bg-emerald-700"; // 2 solves
+                    if (day.count >= 3) colorClass = "bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.2)]"; // 3+ solves
+
+                    return (
+                      <div
+                        key={index}
+                        title={`${day.date}: ${day.count} problem(s) solved`}
+                        className={`w-4 h-4 rounded-[3px] transition-all duration-300 hover:scale-125 cursor-pointer ${colorClass}`}
+                      />
+                    );
+                  })}
+                </div>
+
+                {/* Subtext Summary Dashboard Footer */}
+                <div className="grid grid-cols-3 gap-6 text-center w-full max-w-lg pt-2 border-t border-slate-900/60">
+                  <div>
+                    <p className="text-[10px] text-slate-500 font-medium uppercase tracking-wider">Past Month</p>
+                    <p className="text-xl font-bold text-amber-500 mt-0.5">{data.consistency.daysActive30} <span className="text-xs font-normal text-slate-500">days active</span></p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-slate-500 font-medium uppercase tracking-wider">Past Quarter</p>
+                    <p className="text-xl font-bold text-orange-500 mt-0.5">{data.consistency.daysActive90} <span className="text-xs font-normal text-slate-500">days active</span></p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-slate-500 font-medium uppercase tracking-wider">Total Year Vol</p>
+                    <p className="text-xl font-bold text-emerald-400 mt-0.5">{data.problemsSolved} <span className="text-xs font-normal text-slate-500">solved</span></p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            {/* ------------------------------------------------------------- */}
             {/* ------------ 6/6/2026 ---------- */}
             
             {/* Difficulty Mapping Histogram */}

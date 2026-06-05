@@ -16,7 +16,9 @@ export default function Dashboard() {
     setError('');
     setData(null);
     try {
-      const res = await fetch(`/api/analyze?username=${username}`);
+      const res = await fetch(`/api/analyze?username=${encodeURIComponent(username.trim())}`, {
+  cache: 'no-store',
+});
       if (!res.ok) {
         throw new Error('Profile data sync failed');
       }

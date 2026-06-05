@@ -137,6 +137,32 @@ export default function Dashboard() {
               </div>
             </div>
 
+            {/* --- 6/6/2026 --- */}
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-lg">
+              <h3 className="text-lg font-bold text-slate-100 mb-4 flex items-center gap-2">
+                ⏱️ Platform Consistency & Activity Engine
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-slate-950 border border-slate-900 p-4 rounded-lg">
+                  <p className="text-xs text-slate-400 font-medium">Active Days (Last 30d)</p>
+                  <p className="text-3xl font-extrabold text-amber-500 mt-1">{data.consistency.daysActive30} <span className="text-xs font-normal text-slate-500">days</span></p>
+                </div>
+                <div className="bg-slate-950 border border-slate-900 p-4 rounded-lg">
+                  <p className="text-xs text-slate-400 font-medium">Active Days (Last 90d)</p>
+                  <p className="text-3xl font-extrabold text-orange-500 mt-1">{data.consistency.daysActive90} <span className="text-xs font-normal text-slate-500">days</span></p>
+                </div>
+                <div className="bg-slate-950 border border-slate-900 p-4 rounded-lg">
+                  <p className="text-xs text-slate-400 font-medium">Solving Streak</p>
+                  <p className="text-3xl font-extrabold text-red-500 mt-1">{data.consistency.currentStreak} <span className="text-xs font-normal text-slate-500">current / {data.consistency.maxStreak} max</span></p>
+                </div>
+                <div className="bg-slate-950 border border-slate-900 p-4 rounded-lg">
+                  <p className="text-xs text-slate-400 font-medium">Velocity Average</p>
+                  <p className="text-3xl font-extrabold text-cyan-400 mt-1">{data.consistency.averageProblemsPerWeek} <span className="text-xs font-normal text-slate-500">probs/wk</span></p>
+                </div>
+              </div>
+            </div>
+            {/* ------------ 6/6/2026 ---------- */}
+            
             {/* Difficulty Mapping Histogram */}
             <div className="bg-slate-800 p-4 rounded-xl border border-slate-700">
               <h3 className="text-sm font-bold mb-3 text-slate-300 flex items-center gap-2"><Activity className="w-4 h-4 text-amber-400"/> Problem Solved Distribution by Rating Band</h3>

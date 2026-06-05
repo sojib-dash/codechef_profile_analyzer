@@ -1,141 +1,150 @@
 import { NextResponse } from 'next/server';
 
+export const dynamic = 'force-dynamic';
+
+function hashString(input: string) {
+  let h = 2166136261;
+  for (let i = 0; i < input.length; i++) {
+    h ^= input.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+function mulberry32(a: number) {
+  return function () {
+    let t = (a += 0x6D2B79F5);
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function clamp(n: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, n));
+}
+
+function extractFirstNumber(text: string, patterns: RegExp[]) {
+  for (const p of patterns) {
+    const m = text.match(p);
+    if (m?.[1]) {
+      const n = Number.parseInt(m[1], 10);
+      if (!Number.isNaN(n)) return n;
+    }
+  }
+  return null;
+}
+
+function computeStars(rating: number) {
+  if (rating >= 2200) return '7 ★';
+  if (rating >= 2000) return '6 ★';
+  if (rating >= 1800) return '5 ★';
+  if (rating >= 1600) return '4 ★';
+  if (rating >= 1400) return '3 ★';
+  if (rating >= 1200) return '2 ★';
+  return '1 ★';
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const username = searchParams.get('username');
+  const username = searchParams.get('username')?.trim();
 
   if (!username) {
     return NextResponse.json({ error: 'Username is required' }, { status: 400 });
   }
 
   try {
-    // Fetch directly from CodeChef with standard browser headers to avoid getting blocked
-    const response = await fetch(`https://www.codechef.com/users/${username}`, {
+    const profileUrl = `https://www.codechef.com/users/${encodeURIComponent(username)}`;
+
+    const response = await fetch(profileUrl, {
+      cache: 'no-store',
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
       },
-      next: { revalidate: 60 } // Cache profiles for 1 minute
     });
 
     if (!response.ok) {
-      return NextResponse.json({ error: `CodeChef profile '${username}' not found` }, { status: 404 });
+      return NextResponse.json(
+        { error: `CodeChef profile '${username}' not found` },
+        { status: 404 }
+      );
     }
 
     const html = await response.text();
+    const text = html
+      .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+      .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
 
-    // Regex extraction engine to read CodeChef's internal frontend state object
-    const ratingRegex = /"rating":\s*(\d+)/;
-    const highestRatingRegex = /"highest_rating":\s*(\d+)/;
-    const starsRegex = /"stars":\s*"([^"]+)"/;
-    const globalRankRegex = /"global_rank":\s*(\d+)/;
-    const countryRankRegex = /"country_rank":\s*(\d+)/;
+    const currentRating =
+      extractFirstNumber(text, [
+        /CodeChef Rating[\s\S]{0,80}?\b(\d{3,4})\b\s+\(Div/i,
+        /\b(\d{3,4})\b\s+\(Div\s*\d+/i,
+      ]) ?? 1200;
 
-    const currentRating = parseInt(html.match(ratingRegex)?.[1] || '1200');
-    const highestRating = parseInt(html.match(highestRatingRegex)?.[1] || '1200');
-    let stars = html.match(starsRegex)?.[1] || '1 ★';
-    if (!stars.includes('★')) stars = `${stars} ★`;
+    const highestRating =
+      extractFirstNumber(text, [
+        /CodeChef Rating \(Highest Rating\s*(\d+)\)/i,
+        /Highest Rating\s*(\d+)/i,
+      ]) ?? currentRating;
 
-    const globalRank = html.match(globalRankRegex)?.[1] || 'N/A';
-    const countryRank = html.match(countryRankRegex)?.[1] || 'N/A';
+    const solvedCount =
+      extractFirstNumber(text, [/Total Problems Solved:\s*(\d+)/i]) ?? 0;
 
-    // updated on 6/6/2026
-    // --- Paste this inside the try block, right after countryRank metrics ---
-    
-    // Extract CodeChef's submission calendar dataset if present, or fallback gracefully
-    const submissionTreeRegex = /submissionDash\s*=\s*({[^;]+})/;
-    const submissionDataMatch = html.match(submissionTreeRegex);
-    
-    let daysActive30 = 0;
-    let daysActive90 = 0;
-    let currentStreak = 0;
-    let maxStreak = 0;
-    let averageProblemsPerWeek = 0.0;
+    const globalRankMatch = text.match(/Global Rank[:\s]+(\d+)/i);
+    const countryRankMatch = text.match(/Country Rank[:\s]+(\d+)/i);
 
-    if (submissionDataMatch) {
-      try {
-        const submissionMap = JSON.parse(submissionDataMatch[1]);
-        const submissionDates = Object.keys(submissionMap).map(d => new Date(d)).sort((a, b) => b.getTime() - a.getTime());
-        
-        const now = new Date();
-        const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-        const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+    const globalRank = globalRankMatch?.[1] ?? 'N/A';
+    const countryRank = countryRankMatch?.[1] ?? 'N/A';
+    const stars = computeStars(currentRating);
 
-        daysActive30 = submissionDates.filter(d => d >= thirtyDaysAgo).length;
-        daysActive90 = submissionDates.filter(d => d >= ninetyDaysAgo).length;
+    // Deterministic per-handle seed so different handles do not show the same fake analytics
+    const seed = hashString(username.toLowerCase());
+    const rand = mulberry32(seed);
 
-        // Streak Estimation Engine
-        let tempStreak = 0;
-        let lastDate: Date | null = null;
-        
-        submissionDates.forEach((d) => {
-          if (!lastDate) {
-            tempStreak = 1;
-          } else {
-            const diffTime = Math.abs(lastDate.getTime() - d.getTime());
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-            if (diffDays === 1) {
-              tempStreak++;
-            } else if (diffDays > 1) {
-              if (tempStreak > maxStreak) maxStreak = tempStreak;
-              tempStreak = 1;
-            }
-          }
-          lastDate = d;
-        });
-        if (tempStreak > maxStreak) maxStreak = tempStreak;
-        
-        // Current active streak head confirmation
-        if (submissionDates.length > 0) {
-          const hoursSinceLastSubmission = Math.abs(now.getTime() - submissionDates[0].getTime()) / (1000 * 60 * 60);
-          currentStreak = hoursSinceLastSubmission <= 48 ? maxStreak : 0;
-        }
-      } catch (e) {
-        // Fallback
-      }
-    }
+    const daysActive30 = clamp(Math.round((solvedCount / 12) + rand() * 6), 0, 30);
+    const daysActive90 = clamp(daysActive30 + Math.round(rand() * 20), daysActive30, 90);
+    const currentStreak = daysActive30 > 0 ? clamp(Math.round(rand() * 7), 1, 7) : 0;
+    const maxStreak = clamp(currentStreak + Math.round(rand() * 10), currentStreak, 30);
+    const averageProblemsPerWeek = Number(((daysActive90 * 1.2) / 12).toFixed(1));
 
-    if (daysActive90 === 0) {
-      daysActive30 = Math.floor(Math.random() * 8) + 4;
-      daysActive90 = daysActive30 + Math.floor(Math.random() * 15) + 10;
-      currentStreak = Math.floor(Math.random() * 4) + 1;
-      maxStreak = currentStreak + Math.floor(Math.random() * 6);
-    }
-    
-    const problemsSolved = Math.floor(currentRating * 0.08) + daysActive90;
-    averageProblemsPerWeek = parseFloat(((daysActive90 * 1.8) / 12).toFixed(1));
-    // updated on 6/6/2026
-    // Generates chronological sample data based on your tier metrics
-    const contestHistory = [
-      { name: 'Start', rating: 1200, rank: 0 },
-      { name: 'Contest 1', rating: Math.round(currentRating * 0.9), rank: 2450 },
-      { name: 'Contest 2', rating: Math.round(currentRating * 0.95), rank: 1120 },
-      { name: 'Contest 3', rating: currentRating, rank: 450 }
+    const topicAnalyze = [
+      { topic: 'Arrays & Strings', solved: clamp(Math.round(solvedCount * (0.28 + rand() * 0.12)), 0, solvedCount), accuracy: clamp(Math.round(70 + rand() * 20), 40, 98) },
+      { topic: 'Greedy Algorithms', solved: clamp(Math.round(solvedCount * (0.14 + rand() * 0.08)), 0, solvedCount), accuracy: clamp(Math.round(58 + rand() * 28), 30, 95) },
+      { topic: 'Dynamic Programming', solved: clamp(Math.round(solvedCount * (0.05 + rand() * 0.05)), 0, solvedCount), accuracy: clamp(Math.round(25 + rand() * 25), 10, 85) },
+      { topic: 'Graph Theory', solved: clamp(Math.round(solvedCount * (0.04 + rand() * 0.04)), 0, solvedCount), accuracy: clamp(Math.round(20 + rand() * 25), 8, 80) },
+      { topic: 'Math & Number Theory', solved: clamp(Math.round(solvedCount * (0.18 + rand() * 0.10)), 0, solvedCount), accuracy: clamp(Math.round(65 + rand() * 22), 35, 97) },
     ];
 
-    const mockTopics = [
-      { topic: 'Arrays & Strings', solved: 45, accuracy: 78 },
-      { topic: 'Greedy Algorithms', solved: 22, accuracy: 64 },
-      { topic: 'Dynamic Programming', solved: 8, accuracy: 31 },
-      { topic: 'Graph Theory', solved: 4, accuracy: 25 },
-      { topic: 'Math & Number Theory', solved: 33, accuracy: 82 }
+    const weaknesses = topicAnalyze
+      .filter((t) => t.accuracy < 50 || t.solved < 10)
+      .map((t) => t.topic);
+
+    const roadmap = [
+      weaknesses.length
+        ? `Target focus: Solve 15 problems specifically in: ${weaknesses.join(', ')}.`
+        : 'Keep solving mixed-difficulty problems to stay balanced.',
+      `Attempt contests regularly to stabilize your active execution profile.`,
+      `Bridge the gap between your current rating (${currentRating}) and peak historical maximum (${highestRating}).`,
+    ];
+
+    const contestHistory = [
+      { name: 'Start', rating: Math.max(0, currentRating - 250), rank: 0 },
+      { name: 'Contest 1', rating: Math.max(0, currentRating - 120), rank: Math.round(2000 + rand() * 1000) },
+      { name: 'Contest 2', rating: Math.max(0, currentRating - 40), rank: Math.round(1000 + rand() * 800) },
+      { name: 'Contest 3', rating: currentRating, rank: Math.round(200 + rand() * 700) },
     ];
 
     const problemsSolvedOverview = [
-      { name: '800-1200', count: 55 },
-      { name: '1200-1400', count: 32 },
-      { name: '1400-1600', count: 18 },
-      { name: '1600-1800', count: 6 },
-      { name: '1800+', count: 1 },
-    ];
-
-    const weaknesses = mockTopics
-      .filter(t => t.accuracy < 50 || t.solved < 10)
-      .map(t => t.topic);
-
-    const roadmap = [
-      `Target focus: Solve 15 problems specifically in: ${weaknesses.join(', ')}.`,
-      `Attempt contests regularly to stabilize your active execution profile.`,
-      `Bridge the gap between your current rating (${currentRating}) and peak historical maximum (${highestRating}).`
+      { name: '800-1200', count: Math.round(solvedCount * 0.45) },
+      { name: '1200-1400', count: Math.round(solvedCount * 0.28) },
+      { name: '1400-1600', count: Math.round(solvedCount * 0.15) },
+      { name: '1600-1800', count: Math.round(solvedCount * 0.08) },
+      { name: '1800+', count: Math.max(0, Math.round(solvedCount * 0.04)) },
     ];
 
     const recentSolves = [
@@ -143,20 +152,21 @@ export async function GET(request: Request) {
       { code: 'TSORT', name: 'Turbo Sort' },
       { code: 'ATM', name: 'HS08TEST' },
     ];
-    
+
     const calendarData = Array.from({ length: 30 }, (_, i) => {
       const d = new Date();
       d.setDate(d.getDate() - (29 - i));
       const dateString = d.toISOString().split('T')[0];
-      
-      // Simulates activity bursts (creates dark green, light green, or gray squares)
+
       let activityCount = 0;
-      if (i % 5 === 0 || i % 8 === 0) activityCount = Math.floor(Math.random() * 3) + 1; 
-      if (i > 22 && daysActive30 > 5) activityCount = Math.floor(Math.random() * 4) + 1;
+      const seedRand = mulberry32(seed + i)();
+      if (seedRand > 0.78) activityCount = 1;
+      if (seedRand > 0.88) activityCount = 2;
+      if (seedRand > 0.95) activityCount = 3;
 
       return { date: dateString, count: activityCount };
     });
-    
+
     return NextResponse.json({
       username,
       currentRating,
@@ -164,23 +174,26 @@ export async function GET(request: Request) {
       stars,
       globalRank,
       countryRank,
-      problemsSolved: mockTopics.reduce((a, b) => a + b.solved, 0),
-      // ---6/6/2026---
-      consistency: { daysActive30, daysActive90, currentStreak, maxStreak, averageProblemsPerWeek },
+      problemsSolved: solvedCount,
+      consistency: {
+        daysActive30,
+        daysActive90,
+        currentStreak,
+        maxStreak,
+        averageProblemsPerWeek,
+      },
       calendarData,
-      // ----6/6/2026----------------
-      averageRank: 1340,
-      bestContestPerformance: `Rank #450`,
+      averageRank: Math.max(1, Math.round(currentRating * 0.9)),
+      bestContestPerformance: `Rank #${Math.max(1, Math.round(200 + rand() * 800))}`,
       improvementTrend: currentRating >= 1400 ? 'Upward Spike' : 'Stable',
       contestHistory,
       problemsSolvedOverview,
-      topicAnalyze: mockTopics,
+      topicAnalyze,
       weaknesses,
       roadmap,
-      recentSolves
+      recentSolves,
     });
-
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Failed parsing core backend telemetry' }, { status: 500 });
   }
 }

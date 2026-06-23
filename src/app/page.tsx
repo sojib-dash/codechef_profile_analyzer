@@ -19,7 +19,7 @@ export default function Home() {
       description: 'Track rating subdivisions, contest rank shifts, and performance histograms.',
       color: 'from-blue-500 to-cyan-600',
       badgeColor: 'text-slate-400 bg-slate-800 border-slate-700',
-      status: 'Coming Soon'
+      status: 'Active'
     },
     {
       name: 'LeetCode',

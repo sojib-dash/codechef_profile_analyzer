@@ -105,8 +105,7 @@ export default function CodeforcesAnalyzer() {
                 <p className="text-xs text-slate-400 font-medium uppercase">Peak Max Rating</p>
                 <p className="text-3xl font-black text-cyan-400 mt-1">{data.highestRating} <span className="text-xs font-normal text-slate-500">({data.maxRank})</span></p>
               </div>
-            </div>
-            <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl shadow-md">
+              <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl shadow-md">
                 <p className="text-xs text-slate-400 font-medium uppercase">Total Contests</p>
                 <p className="text-2xl font-black text-amber-400 mt-1">{data.totalContests} <span className="text-xs font-normal text-slate-500">attended</span></p>
               </div>
@@ -114,6 +113,7 @@ export default function CodeforcesAnalyzer() {
                 <p className="text-xs text-slate-400 font-medium uppercase">Contest-Time Solves</p>
                 <p className="text-2xl font-black text-emerald-400 mt-1">{data.problemsSolvedInContestTime} <span className="text-xs font-normal text-slate-500">problems</span></p>
               </div>
+            </div>
             {/* Performance Chart */}
             <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl shadow-lg">
               <h3 className="text-sm font-semibold text-slate-300 mb-4">Official Rating Timeline Progression</h3>
